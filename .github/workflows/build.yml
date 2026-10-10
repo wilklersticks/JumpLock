@@ -95,13 +95,7 @@ jobs:
           Write-Host "DLL: $($dll.FullName)"
           Write-Host "Manifest: $manifestPath"
 
-          # The zip Dalamud downloads: the DLL plus its manifest.
-          New-Item -ItemType Directory -Force -Path pkg | Out-Null
-          Copy-Item $dll.FullName pkg/
-          Copy-Item $manifestPath pkg/JumpLock.json
-          Compress-Archive -Force -Path pkg/* -DestinationPath latest.zip
-
-          # The repo listing (pluginmaster.json) Dalamud reads.
+          # Manifest details shared by the zip and the repo listing.
           $repo = "${{ github.repository }}"
           $branch = "${{ github.ref_name }}"
           $download = "https://github.com/$repo/releases/latest/download/latest.zip"
@@ -118,6 +112,17 @@ jobs:
             LastUpdate          = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
           }
           foreach ($k in $extra.Keys) { $m | Add-Member -NotePropertyName $k -NotePropertyValue $extra[$k] -Force }
+
+          # The zip Dalamud downloads: DLL, full manifest, and the icon in images/
+          # (installed plugins load their icon from these local files).
+          New-Item -ItemType Directory -Force -Path pkg/images | Out-Null
+          Copy-Item $dll.FullName pkg/
+          ConvertTo-Json -InputObject $m -Depth 10 | Set-Content pkg/JumpLock.json -Encoding utf8
+          if (Test-Path images/icon.png) { Copy-Item images/icon.png pkg/images/icon.png }
+          else { Write-Warning "images/icon.png not found in the repo; plugin will have no icon." }
+          Compress-Archive -Force -Path pkg/* -DestinationPath latest.zip
+
+          # The repo listing (pluginmaster.json) Dalamud reads.
           ConvertTo-Json -InputObject @($m) -Depth 10 | Set-Content pluginmaster.json -Encoding utf8
 
           "## Jump Lock $env:VERSION" >> $env:GITHUB_STEP_SUMMARY
