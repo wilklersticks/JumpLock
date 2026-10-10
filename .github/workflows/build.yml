@@ -58,6 +58,7 @@ jobs:
           $m = Get-Content $manifestPath -Raw | ConvertFrom-Json
           $extra = @{
             RepoUrl             = "https://github.com/$repo"
+            IconUrl             = "https://raw.githubusercontent.com/$repo/$branch/images/icon.png"
             DownloadLinkInstall = $download
             DownloadLinkUpdate  = $download
             DownloadLinkTesting = $download
