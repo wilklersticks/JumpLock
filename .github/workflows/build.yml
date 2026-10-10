@@ -28,10 +28,17 @@ jobs:
         shell: pwsh
         run: dotnet build JumpLock/JumpLock.csproj -c Release
 
+      - name: Show where the plugin was built
+        shell: pwsh
+        run: Get-ChildItem -Recurse -Filter JumpLock.dll | Where-Object FullName -notmatch '\\obj\\' | ForEach-Object FullName
+
       - name: Upload plugin
         uses: actions/upload-artifact@v4
         with:
           name: JumpLock-plugin
-          # Contains JumpLock.dll and JumpLock.json (plus a packaged zip)
-          path: JumpLock/bin/x64/Release/
+          path: |
+            **/JumpLock.dll
+            **/JumpLock.json
+            **/latest.zip
+            !**/obj/**
           if-no-files-found: error
