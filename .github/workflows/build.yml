@@ -1,0 +1,37 @@
+name: Build Jump Lock
+
+# Runs on every upload/push, and can be started by hand from the Actions tab.
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Download Dalamud reference files
+        shell: pwsh
+        run: |
+          $dest = "$env:AppData\XIVLauncher\addon\Hooks\dev"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Invoke-WebRequest -Uri https://goatcorp.github.io/dalamud-distrib/latest.zip -OutFile latest.zip
+          Expand-Archive -Force latest.zip $dest
+
+      - name: Build
+        shell: pwsh
+        run: dotnet build JumpLock/JumpLock.csproj -c Release
+
+      - name: Upload plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: JumpLock-plugin
+          # Contains JumpLock.dll and JumpLock.json (plus a packaged zip)
+          path: JumpLock/bin/x64/Release/
+          if-no-files-found: error
