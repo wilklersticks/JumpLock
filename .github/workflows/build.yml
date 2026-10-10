@@ -1,18 +1,22 @@
 name: Build Jump Lock
 
-# Runs on every upload/push, and can be started by hand from the Actions tab.
 on:
   push:
+    paths-ignore:
+      - 'pluginmaster.json'
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
@@ -21,24 +25,64 @@ jobs:
         run: |
           $dest = "$env:AppData\XIVLauncher\addon\Hooks\dev"
           New-Item -ItemType Directory -Force -Path $dest | Out-Null
-          Invoke-WebRequest -Uri https://goatcorp.github.io/dalamud-distrib/latest.zip -OutFile latest.zip
-          Expand-Archive -Force latest.zip $dest
+          Invoke-WebRequest -Uri https://goatcorp.github.io/dalamud-distrib/latest.zip -OutFile dalamud.zip
+          Expand-Archive -Force dalamud.zip $dest
 
+      # Every build gets a new version number so Dalamud knows to update.
       - name: Build
         shell: pwsh
-        run: dotnet build JumpLock/JumpLock.csproj -c Release
+        run: dotnet build JumpLock/JumpLock.csproj -c Release -p:Version=0.1.0.${{ github.run_number }}
 
-      - name: Show where the plugin was built
+      - name: Package plugin and repo file
         shell: pwsh
-        run: Get-ChildItem -Recurse -Filter JumpLock.dll | Where-Object FullName -notmatch '\\obj\\' | ForEach-Object FullName
+        run: |
+          $dll = Get-ChildItem -Recurse -Filter JumpLock.dll | Where-Object FullName -notmatch '\\obj\\' | Select-Object -First 1
+          if (-not $dll) { throw "JumpLock.dll not found" }
+          $manifestPath = Join-Path $dll.DirectoryName 'JumpLock.json'
+          if (-not (Test-Path $manifestPath)) {
+            $manifestPath = (Get-ChildItem -Recurse -Filter JumpLock.json | Where-Object FullName -notmatch '\\obj\\' | Select-Object -First 1).FullName
+          }
+          Write-Host "DLL: $($dll.FullName)"
+          Write-Host "Manifest: $manifestPath"
 
-      - name: Upload plugin
-        uses: actions/upload-artifact@v4
-        with:
-          name: JumpLock-plugin
-          path: |
-            **/JumpLock.dll
-            **/JumpLock.json
-            **/latest.zip
-            !**/obj/**
-          if-no-files-found: error
+          # The zip Dalamud downloads: the DLL plus its manifest.
+          New-Item -ItemType Directory -Force -Path pkg | Out-Null
+          Copy-Item $dll.FullName pkg/
+          Copy-Item $manifestPath pkg/JumpLock.json
+          Compress-Archive -Force -Path pkg/* -DestinationPath latest.zip
+
+          # The repo listing (pluginmaster.json) Dalamud reads.
+          $repo = "${{ github.repository }}"
+          $branch = "${{ github.ref_name }}"
+          $download = "https://github.com/$repo/releases/latest/download/latest.zip"
+          $m = Get-Content $manifestPath -Raw | ConvertFrom-Json
+          $extra = @{
+            RepoUrl             = "https://github.com/$repo"
+            DownloadLinkInstall = $download
+            DownloadLinkUpdate  = $download
+            DownloadLinkTesting = $download
+            IsHide              = $false
+            IsTestingExclusive  = $false
+            LastUpdate          = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+          }
+          foreach ($k in $extra.Keys) { $m | Add-Member -NotePropertyName $k -NotePropertyValue $extra[$k] -Force }
+          ConvertTo-Json -InputObject @($m) -Depth 10 | Set-Content pluginmaster.json -Encoding utf8
+
+          "VERSION=$($m.AssemblyVersion)" >> $env:GITHUB_ENV
+          "## Your Dalamud repo URL" >> $env:GITHUB_STEP_SUMMARY
+          "``https://raw.githubusercontent.com/$repo/$branch/pluginmaster.json``" >> $env:GITHUB_STEP_SUMMARY
+
+      - name: Publish release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "v$env:VERSION" latest.zip --title "Jump Lock $env:VERSION" --notes "Automatic build" --latest
+
+      - name: Update pluginmaster.json
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pluginmaster.json
+          git commit -m "Update pluginmaster.json to $env:VERSION [skip ci]"
+          git push
