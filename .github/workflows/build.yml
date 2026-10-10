@@ -1,5 +1,11 @@
 name: Build Jump Lock
 
+# Versioning is automatic. The commit message decides the bump:
+#   "major: ..."  -> 1.0.0   (big / breaking change)
+#   "feat: ..."   -> 0.2.0   (new feature)
+#   anything else -> 0.1.1   (fix or small change)
+# The message (without the prefix) becomes the changelog shown in /xlplugins.
+
 on:
   push:
     paths-ignore:
@@ -8,6 +14,11 @@ on:
 
 permissions:
   contents: write
+
+# If you commit twice quickly, the second build waits so versions never collide.
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -28,10 +39,49 @@ jobs:
           Invoke-WebRequest -Uri https://goatcorp.github.io/dalamud-distrib/latest.zip -OutFile dalamud.zip
           Expand-Archive -Force dalamud.zip $dest
 
-      # Every build gets a new version number so Dalamud knows to update.
+      - name: Work out the next version
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          # Start from the newest release; if there isn't one yet, use <Version> from the csproj.
+          $last = gh release list --limit 1 --json tagName --jq '.[0].tagName' 2>$null
+          if ($last) {
+            $p = $last.TrimStart('v').Split('.')
+          } else {
+            [xml]$proj = Get-Content JumpLock/JumpLock.csproj
+            $base = @($proj.Project.PropertyGroup | ForEach-Object { $_.Version } | Where-Object { $_ })[0]
+            $p = $base.Trim().Split('.')
+          }
+          [int]$major = $p[0]; [int]$minor = $p[1]; [int]$patch = $p[2]
+
+          # First line of the commit message decides the bump.
+          $msg = ("$env:COMMIT_MSG" -split "`n")[0].Trim()
+          if (-not $msg) { $msg = "Manual build" }
+
+          if ($msg -match '^(?i)major:\s*(.*)$') {
+            $major++; $minor = 0; $patch = 0; $notes = $Matches[1]
+          } elseif ($msg -match '^(?i)feat(ure)?:\s*(.*)$') {
+            $minor++; $patch = 0; $notes = $Matches[2]
+          } else {
+            if ($last) { $patch++ }   # the very first release keeps the csproj version as-is
+            $notes = $msg -replace '^(?i)fix:\s*', ''
+          }
+          if (-not $notes.Trim()) { $notes = $msg }
+
+          $version = "$major.$minor.$patch"
+          Write-Host "Last release: $last  ->  New version: $version"
+          Write-Host "Changelog: $notes"
+          "VERSION=$version" >> $env:GITHUB_ENV
+          # Multi-line-safe way to pass the notes along
+          "NOTES<<EOF" >> $env:GITHUB_ENV
+          $notes >> $env:GITHUB_ENV
+          "EOF" >> $env:GITHUB_ENV
+
       - name: Build
         shell: pwsh
-        run: dotnet build JumpLock/JumpLock.csproj -c Release -p:Version=0.1.0.${{ github.run_number }}
+        run: dotnet build JumpLock/JumpLock.csproj -c Release -p:Version=$env:VERSION
 
       - name: Package plugin and repo file
         shell: pwsh
@@ -59,6 +109,7 @@ jobs:
           $extra = @{
             RepoUrl             = "https://github.com/$repo"
             IconUrl             = "https://raw.githubusercontent.com/$repo/$branch/images/icon.png"
+            Changelog           = "$env:NOTES"
             DownloadLinkInstall = $download
             DownloadLinkUpdate  = $download
             DownloadLinkTesting = $download
@@ -69,15 +120,16 @@ jobs:
           foreach ($k in $extra.Keys) { $m | Add-Member -NotePropertyName $k -NotePropertyValue $extra[$k] -Force }
           ConvertTo-Json -InputObject @($m) -Depth 10 | Set-Content pluginmaster.json -Encoding utf8
 
-          "VERSION=$($m.AssemblyVersion)" >> $env:GITHUB_ENV
-          "## Your Dalamud repo URL" >> $env:GITHUB_STEP_SUMMARY
-          "``https://raw.githubusercontent.com/$repo/$branch/pluginmaster.json``" >> $env:GITHUB_STEP_SUMMARY
+          "## Jump Lock $env:VERSION" >> $env:GITHUB_STEP_SUMMARY
+          "$env:NOTES" >> $env:GITHUB_STEP_SUMMARY
+          "" >> $env:GITHUB_STEP_SUMMARY
+          "Your Dalamud repo URL: ``https://raw.githubusercontent.com/$repo/$branch/pluginmaster.json``" >> $env:GITHUB_STEP_SUMMARY
 
       - name: Publish release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "v$env:VERSION" latest.zip --title "Jump Lock $env:VERSION" --notes "Automatic build" --latest
+        run: gh release create "v$env:VERSION" latest.zip --title "Jump Lock $env:VERSION" --notes "$env:NOTES" --latest
 
       - name: Update pluginmaster.json
         shell: pwsh
