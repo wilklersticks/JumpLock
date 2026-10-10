@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Dalamud.NET.Sdk/15.0.0">
+  <PropertyGroup>
+    <Version>0.1.0.0</Version>
+    <!-- Manifest fields: DalamudPackager turns these into JumpLock.json next to the DLL -->
+    <Author>your name here</Author>
+    <Name>Jump Lock</Name>
+    <Punchline>Stop accidental jumps during RP, posing, and social events.</Punchline>
+    <Description>Disables the jump key on demand, or automatically inside houses, apartments, FC rooms, or zones you choose.
+Toggle it from the window, with /jumplock, or let it switch on by itself when you walk into a venue.</Description>
+    <Tags>roleplay;housing;jump;gpose;social</Tags>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+</Project>
