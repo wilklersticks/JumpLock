@@ -3,7 +3,7 @@
     "Author": "your name here",
     "Name": "Jump Lock",
     "InternalName": "JumpLock",
-    "AssemblyVersion": "0.1.2.0",
+    "AssemblyVersion": "0.1.3.0",
     "Description": "Disables the jump key on demand, or automatically inside houses, apartments, FC rooms, or zones you choose.\r\nToggle it from the window, with /jumplock, or let it switch on by itself when you walk into a venue.",
     "ApplicableVersion": "any",
     "Tags": [
@@ -20,14 +20,14 @@
     "LoadPriority": 0,
     "Punchline": "Stop accidental jumps during RP, posing, and social events.",
     "AcceptsFeedback": true,
-    "DownloadLinkTesting": "https://github.com/wilklersticks/JumpLock/releases/latest/download/latest.zip",
-    "LastUpdate": 1791609352,
-    "Changelog": "Update build.yml",
-    "IconUrl": "https://raw.githubusercontent.com/wilklersticks/JumpLock/main/images/icon.png",
-    "DownloadLinkInstall": "https://github.com/wilklersticks/JumpLock/releases/latest/download/latest.zip",
-    "DownloadLinkUpdate": "https://github.com/wilklersticks/JumpLock/releases/latest/download/latest.zip",
-    "RepoUrl": "https://github.com/wilklersticks/JumpLock",
     "IsTestingExclusive": false,
-    "IsHide": false
+    "DownloadLinkTesting": "https://github.com/wilklersticks/JumpLock/releases/download/v0.1.3/latest.zip",
+    "Changelog": "Update build.yml",
+    "IsHide": false,
+    "LastUpdate": 1792165624,
+    "DownloadLinkUpdate": "https://github.com/wilklersticks/JumpLock/releases/download/v0.1.3/latest.zip",
+    "DownloadLinkInstall": "https://github.com/wilklersticks/JumpLock/releases/download/v0.1.3/latest.zip",
+    "RepoUrl": "https://github.com/wilklersticks/JumpLock",
+    "IconUrl": "https://raw.githubusercontent.com/wilklersticks/JumpLock/main/images/icon.png"
   }
 ]
