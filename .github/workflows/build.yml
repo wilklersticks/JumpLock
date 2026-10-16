@@ -98,7 +98,9 @@ jobs:
           # Manifest details shared by the zip and the repo listing.
           $repo = "${{ github.repository }}"
           $branch = "${{ github.ref_name }}"
-          $download = "https://github.com/$repo/releases/latest/download/latest.zip"
+          # Pin the download to THIS release, so the listed version always matches the zip
+          # (a "latest" link would hand out a newer zip than an older listing promises).
+          $download = "https://github.com/$repo/releases/download/v$env:VERSION/latest.zip"
           $m = Get-Content $manifestPath -Raw | ConvertFrom-Json
           $extra = @{
             RepoUrl             = "https://github.com/$repo"
